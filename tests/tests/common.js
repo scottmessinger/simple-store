@@ -1,5 +1,5 @@
-var Contact = Ember.Resource.extend({
-  resourceUrl:        '/contacts',
+var Contact = SimpleStore.Model.extend({
+  url:        '/contacts',
   resourceName:       'contact',
   resourceProperties: ['first_name', 'last_name'],
 

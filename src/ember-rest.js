@@ -1,3 +1,5 @@
+SimpleStore = {}
+
 /**
  Ember-REST.js 0.1.1
 
@@ -12,24 +14,24 @@
 /**
   An adapter for performing resource requests
 
-  The default implementation is a thin wrapper around jQuery.ajax(). It is mixed in to both Ember.Resource
-  and Ember.ResourceController.
+  The default implementation is a thin wrapper around jQuery.ajax(). It is mixed in to both SimpleStore.Model
+  and SimpleStore.Collection.
 
-  To override Ember.ResourceAdapter entirely, define your own version and include it before this module.
+  To override SimpleStore.ModelAdapter entirely, define your own version and include it before this module.
 
-  To override a portion of this adapter, reopen it directly or reopen a particular Ember.Resource or
-  Ember.ResourceController. You can override `_resourceRequest()` entirely, or just provide an implementation of
+  To override a portion of this adapter, reopen it directly or reopen a particular SimpleStore.Model or
+  SimpleStore.Collection. You can override `_resourceRequest()` entirely, or just provide an implementation of
   `_prepareResourceRequest(params)` to adjust request params before `jQuery.ajax(params)`.
 */
-if (Ember.ResourceAdapter === undefined) {
-  Ember.ResourceAdapter = Ember.Mixin.create({
+if (SimpleStore.ModelAdapter === undefined) {
+  SimpleStore.ModelAdapter = Ember.Mixin.create({
     /**
       @private
 
       Performs an XHR request with `jQuery.ajax()`. Calls `_prepareResourceRequest(params)` if defined.
     */
     _resourceRequest: function(params) {
-      params.url = this._resourceUrl();
+      params.url = this._url();
       params.dataType = 'json';
 
       if (this._prepareResourceRequest !== undefined) {
@@ -47,7 +49,7 @@ if (Ember.ResourceAdapter === undefined) {
   Extend this class and define the following properties:
 
   * `resourceIdField` -- the id field for this resource ('id' by default)
-  * `resourceUrl` -- the base url of the resource (e.g. '/contacts');
+  * `url` -- the base url of the resource (e.g. '/contacts');
        will append '/' + id for individual resources (required)
   * `resourceName` -- the name used to contain the serialized data in this
        object's JSON representation (required only for serialization)
@@ -65,14 +67,14 @@ if (Ember.ResourceAdapter === undefined) {
   * `deserializeProperty(prop, value)`
   * `validate()`
 */
-Ember.Resource = Ember.Object.extend(Ember.ResourceAdapter, Ember.Copyable, {
+SimpleStore.Model = Ember.Object.extend(SimpleStore.ModelAdapter, Ember.Copyable, {
   resourceIdField: 'id',
-  resourceUrl:     Ember.required(),
+  url:     Ember.required(),
 
   /**
     Duplicate properties from another resource
 
-    * `source` -- an Ember.Resource object
+    * `source` -- an SimpleStore.Model object
     * `props` -- the array of properties to be duplicated;
          defaults to `resourceProperties`
   */
@@ -217,11 +219,11 @@ Ember.Resource = Ember.Object.extend(Ember.ResourceAdapter, Ember.Copyable, {
   /**
     @private
 
-    The URL for this resource, based on `resourceUrl` and `_resourceId()` (which will be
+    The URL for this resource, based on `url` and `_resourceId()` (which will be
       undefined for new resources).
   */
-  _resourceUrl: function() {
-    var url = this.resourceUrl,
+  _url: function() {
+    var url = this.url,
         id = this._resourceId();
 
     if (id !== undefined)
@@ -245,13 +247,17 @@ Ember.Resource = Ember.Object.extend(Ember.ResourceAdapter, Ember.Copyable, {
 
   Extend this class and define the following:
 
-  * `resourceType` -- an Ember.Resource class; the class must have a `serialize()` method
+  * `model` -- an SimpleStore.Model class; the class must have a `serialize()` method
        that returns a JSON representation of the object
-  * `resourceUrl` -- (optional) the base url of the resource (e.g. '/contacts/active');
-       will default to the `resourceUrl` for `resourceType`
+  * `url` -- (optional) the base url of the resource (e.g. '/contacts/active');
+       will default to the `url` for `model`
 */
-Ember.ResourceController = Ember.ArrayController.extend(Ember.ResourceAdapter, {
-  resourceType: Ember.required(),
+SimpleStore.Store = Ember.Object.extend({
+  
+});
+
+SimpleStore.Collection = Ember.ArrayProxy.extend(SimpleStore.ModelAdapter, {
+  model: Ember.required(),
 
   /**
     @private
@@ -259,18 +265,43 @@ Ember.ResourceController = Ember.ArrayController.extend(Ember.ResourceAdapter, {
   init: function() {
     this._super();
     this.clearAll();
+    this.index = Ember.A();
   },
 
   /**
-    Create and load a single `Ember.Resource` from JSON
+    Create and load a single `SimpleStore.Model` from JSON
   */
   load: function(json) {
-    var resource = this.get('resourceType').create().deserialize(json);
+    var resource = this.get('model').create().deserialize(json);
     this.pushObject(resource);
+    this.index.push(resource[resource.resourceIdField])
+  },
+
+  findById: function(id){
+    var index = this.get('index').indexOf(id)
+    if (index > -1){
+      return this.get('content')[index]
+    } else {
+      return this.findFromServer(id)
+    }
+  },
+
+  findFromServer: function(id){
+    var self = this;
+
+    var record = this.model.create({id: id, state: 'finding'})
+
+    this._resourceRequest({type: 'GET'})
+    .done(function(json) {
+      record.deserialize(json);
+      record.set('state', 'loaded')
+    });
+
+    return record
   },
 
   /**
-    Create and load `Ember.Resource` objects from a JSON array
+    Create and load `SimpleStore.Model` objects from a JSON array
   */
   loadAll: function(json) {
     for (var i=0; i < json.length; i++)
@@ -282,6 +313,7 @@ Ember.ResourceController = Ember.ArrayController.extend(Ember.ResourceAdapter, {
   */
   clearAll: function() {
     this.set("content", []);
+    this.set("index", [])
   },
 
   /**
@@ -302,28 +334,28 @@ Ember.ResourceController = Ember.ArrayController.extend(Ember.ResourceAdapter, {
 
     Base URL for requests
 
-    Will use the `resourceUrl` set for this controller, or if that's missing,
-    the `resourceUrl` specified for `resourceType`.
+    Will use the `url` set for this controller, or if that's missing,
+    the `url` specified for `model`.
   */
-  _resourceUrl: function() {
-    if (this.resourceUrl === undefined) {
-      // If `resourceUrl` is not defined for this controller, there are a couple
+  _url: function() {
+    if (this.url === undefined) {
+      // If `url` is not defined for this controller, there are a couple
       // ways to retrieve it from the resource. If a resource has been instantiated,
       // then it can be retrieved from the resource's prototype. Otherwise, we need
-      // to loop through the mixins for the prototype to get the resourceUrl.
-      var rt = this.get('resourceType');
-      if (rt.prototype.resourceUrl === undefined) {
+      // to loop through the mixins for the prototype to get the url.
+      var rt = this.get('model');
+      if (rt.prototype.url === undefined) {
         for (var i = rt.PrototypeMixin.mixins.length - 1; i >= 0; i--) {
           var m = rt.PrototypeMixin.mixins[i];
-          if (m.properties !== undefined && m.properties.resourceUrl !== undefined) {
-            return m.properties.resourceUrl;
+          if (m.properties !== undefined && m.properties.url !== undefined) {
+            return m.properties.url;
           }
         }
       }
       else {
-        return rt.prototype.resourceUrl;
+        return rt.prototype.url;
       }
     }
-    return this.resourceUrl;
+    return this.url;
   }
 });

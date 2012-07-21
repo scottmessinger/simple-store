@@ -1,6 +1,6 @@
 var server = null;
 
-module("Ember.Resource", {
+module("SimpleStore.Model", {
   setup: function() {
     server = sinon.fakeServer.create();
   },
@@ -51,9 +51,9 @@ test("should duplicate properties from another resource", function() {
   equal(contact2.get("last_name"),  contact.get("last_name"),  "last_name matches");
 });
 
-test("should determine a resourceUrl based upon id", function() {
+test("should determine a url based upon id", function() {
   var contact = Contact.create({id: 1});
-  equal(contact._resourceUrl(), "/contacts/1");
+  equal(contact._url(), "/contacts/1");
 });
 
 test("should interpret whether resource is new based upon id", function() {

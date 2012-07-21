@@ -1,64 +1,92 @@
-var contactsController = null,
+var store = null,
     server = null;
 
-module("Ember.ResourceController", {
+module("SimpleStore.Collection", {
   setup: function() {
-    contactsController = Ember.ResourceController.create({
-      resourceType: Contact
+    store = SimpleStore.Store.create()
+    store.contacts = SimpleStore.Collection.create({
+      model: Contact
     });
 
     server = sinon.fakeServer.create();
   },
 
   teardown: function() {
-    contactsController.destroy();
+    store.contacts.destroy();
     server.restore();
   }
 });
 
-test("should use the resourceUrl from its corresponding resource", function() {
-  equal(contactsController._resourceUrl(), "/contacts");
+test("should use the url from its corresponding resource", function() {
+  equal(store.contacts._url(), "/contacts");
 });
 
-test("should use the resourceUrl from a corresponding resource which has not yet been instantiated", function() {
-  contactsController.set("resourceType", Ember.Resource.extend({resourceUrl: '/people'}));
-  equal(contactsController._resourceUrl(), "/people");
+test("should use the url from a corresponding resource which has not yet been instantiated", function() {
+  store.contacts.set("model", SimpleStore.Model.extend({url: '/people'}));
+  equal(store.contacts._url(), "/people");
 });
 
-test("should be able to override resourceUrl", function() {
-  contactsController.set("resourceUrl", "/contacts/active");
-  equal(contactsController._resourceUrl(), "/contacts/active");
+test("should be able to override url", function() {
+  store.contacts.set("url", "/contacts/active");
+  equal(store.contacts._url(), "/contacts/active");
 });
 
 test("should load a single resource from json", function() {
-  equal(contactsController.content.length, 0, "no resources loaded yet");
+  equal(store.contacts.content.length, 0, "no resources loaded yet");
 
-  contactsController.load({id: 1, first_name: "Joe", last_name: "Blow"});
+  store.contacts.load({id: 1, first_name: "Joe", last_name: "Blow"});
 
-  equal(contactsController.content.length, 1, "resource loaded");
+  equal(store.contacts.content.length, 1, "resource loaded");
 });
 
-test("should load an array of resources from json", function() {
-  equal(contactsController.content.length, 0, "no resources loaded yet");
+test("should add the object to the index", function(){
+  store.contacts.load({id: 1, first_name: "joe", last_name: "blow"})
+  equal(store.contacts.content.length, store.contacts.index.length, 'added to index' )
+})
 
-  contactsController.loadAll([{id: 1, first_name: "Joe", last_name: "Blow"},
+test("should load an array of resources from json", function() {
+  equal(store.contacts.content.length, 0, "no resources loaded yet");
+
+  store.contacts.loadAll([{id: 1, first_name: "Joe", last_name: "Blow"},
                               {id: 2, first_name: "Jane", last_name: "Doe"}]);
 
-  equal(contactsController.content.length, 2, "resources loaded");
+  equal(store.contacts.content.length, 2, "resources loaded");
 });
 
 test("should be able to clear resources", function() {
-  equal(contactsController.content.length, 0, "no resources loaded yet");
+  equal(store.contacts.content.length, 0, "no resources loaded yet");
 
-  contactsController.loadAll([{id: 1, first_name: "Joe", last_name: "Blow"},
+  store.contacts.loadAll([{id: 1, first_name: "Joe", last_name: "Blow"},
                               {id: 2, first_name: "Jane", last_name: "Doe"}]);
 
-  equal(contactsController.content.length, 2, "resources loaded");
+  equal(store.contacts.content.length, 2, "resources loaded");
 
-  contactsController.clearAll();
+  store.contacts.clearAll();
 
-  equal(contactsController.content.length, 0, "no resources loaded");
+  equal(store.contacts.content.length, 0, "no resources loaded");
 });
+
+test("should find by ID", function(){
+   store.contacts.loadAll([{id: 1, first_name: "Joe", last_name: "Blow"},
+                              {id: 2, first_name: "Jane", last_name: "Doe"}]);
+ 
+  equal(store.contacts.findById(1).get('first_name'), "Joe", "found")
+})
+
+test("should find from server if ID is not in store", function(){
+  store.contacts.loadAll([{id: 1, first_name: "Joe", last_name: "Blow"},
+                              {id: 2, first_name: "Jane", last_name: "Doe"}]);
+  server.respondWith("GET", "/contacts/3",
+                     [200,
+                      { "Content-Type": "application/json" },
+                      '[{ "id": 3, "first_name": "Tall", "last_name": "Dan" }]']);
+
+  dan = store.contacts.findById(3)
+  server.respond();
+  
+  equal(dan.get('id'), 3, "found by id from server")
+ 
+})
 
 test("should find resources via ajax", function() {
   server.respondWith("GET", "/contacts",
@@ -67,13 +95,13 @@ test("should find resources via ajax", function() {
                       '[{ "id": 1, "first_name": "Joe", "last_name": "Blow" },' +
                        '{ "id": 2, "first_name": "Jane", "last_name": "Doe" }]']);
 
-  equal(contactsController.content.length, 0, "no resources loaded yet");
+  equal(store.contacts.content.length, 0, "no resources loaded yet");
 
-  contactsController.findAll()
+  store.contacts.findAll()
     .done(function() { ok(true,  "findAll() done"); })
     .fail(function() { ok(false, "findAll() fail"); });
 
   server.respond();
 
-  equal(contactsController.content.length, 2, "resources loaded");
+  equal(store.contacts.content.length, 2, "resources loaded");
 });
