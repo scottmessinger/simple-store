@@ -75,21 +75,21 @@ test("using a custom id field, should interpret whether resource is new based up
   equal(newContact.isNew(), true);
 });
 
-test("should find a resource via ajax", function() {
-  server.respondWith("GET", "/contacts/1",
-                     [200,
-                      { "Content-Type": "application/json" },
-                      '{ "id": 1, "first_name": "Joe", "last_name": "Blow" }']);
+// test("should find a resource via ajax", function() {
+//   server.respondWith("GET", "/contacts/1",
+//                      [200,
+//                       { "Content-Type": "application/json" },
+//                       '{ "id": 1, "first_name": "Joe", "last_name": "Blow" }']);
 
-  var contact = Contact.create({id: 1});
-  contact.findResource()
-    .done(function() { ok(true,  "findResource() done"); })
-    .fail(function() { ok(false, "findResource() fail"); });
+//   var contact = Contact.create({id: 1});
+//   contact.findResource()
+//     .done(function() { ok(true,  "findResource() done"); })
+//     .fail(function() { ok(false, "findResource() fail"); });
 
-  server.respond();
+//   server.respond();
 
-  equal(contact.get("fullName"), "Joe Blow", "resource deserialized");
-});
+//   equal(contact.get("fullName"), "Joe Blow", "resource deserialized");
+// });
 
 test("should create a resource via ajax", function() {
   server.respondWith("POST", "/contacts",

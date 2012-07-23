@@ -68,8 +68,10 @@ if (SimpleStore.ModelAdapter === undefined) {
   * `validate()`
 */
 SimpleStore.Model = Ember.Object.extend(SimpleStore.ModelAdapter, Ember.Copyable, {
-  resourceIdField: 'id',
-  url:     Ember.required(),
+  resourceIdField:  'id',
+  url:              Ember.required(),
+  store:            Ember.required(),
+  collection:       Ember.required(),
 
   /**
     Duplicate properties from another resource
@@ -157,20 +159,6 @@ SimpleStore.Model = Ember.Object.extend(SimpleStore.ModelAdapter, Ember.Copyable
   },
 
   /**
-    Request resource and deserialize
-
-    REQUIRED: `id`
-  */
-  findResource: function() {
-    var self = this;
-
-    return this._resourceRequest({type: 'GET'})
-      .done(function(json) {
-        self.deserialize(json);
-      });
-  },
-
-  /**
     Create (if new) or update (if existing) record
 
     Will call validate() if defined for this record
@@ -193,6 +181,8 @@ SimpleStore.Model = Ember.Object.extend(SimpleStore.ModelAdapter, Ember.Copyable
         };
       }
     }
+
+
 
     return this._resourceRequest({type: this.isNew() ? 'POST' : 'PUT',
                                   data: this.serialize()})
@@ -242,6 +232,10 @@ SimpleStore.Model = Ember.Object.extend(SimpleStore.ModelAdapter, Ember.Copyable
   }
 });
 
+SimpleStore.Model.reopenClass({
+  find: function(){console.log(this)}
+})
+
 /**
   A controller for RESTful resources
 
@@ -253,7 +247,7 @@ SimpleStore.Model = Ember.Object.extend(SimpleStore.ModelAdapter, Ember.Copyable
        will default to the `url` for `model`
 */
 SimpleStore.Store = Ember.Object.extend({
-  
+
 });
 
 SimpleStore.Collection = Ember.ArrayProxy.extend(SimpleStore.ModelAdapter, {
@@ -272,18 +266,27 @@ SimpleStore.Collection = Ember.ArrayProxy.extend(SimpleStore.ModelAdapter, {
     Create and load a single `SimpleStore.Model` from JSON
   */
   load: function(json) {
-    var resource = this.get('model').create().deserialize(json);
-    this.pushObject(resource);
-    this.index.push(resource[resource.resourceIdField])
+    var record = this.findByIdInStore(json.id)
+    if (Ember.none(record)) {
+      var record = this.get('model').create().deserialize(json);
+      this.pushObject(record);
+      this.index.push(record[record.resourceIdField])
+    } else {
+      record.deserialize(json)
+    }
   },
 
   findById: function(id){
-    var index = this.get('index').indexOf(id)
-    if (index > -1){
-      return this.get('content')[index]
-    } else {
-      return this.findFromServer(id)
+    var record = this.findByIdInStore(id)
+    if ( Ember.none(record) ){
+      record = this.findFromServer(id)
     }
+    return record
+  },
+
+  findByIdInStore: function(id){
+    var index = this.get('index').indexOf(id)
+    return this.get('content')[index]
   },
 
   findFromServer: function(id){

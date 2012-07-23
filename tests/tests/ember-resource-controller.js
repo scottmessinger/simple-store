@@ -44,6 +44,7 @@ test("should add the object to the index", function(){
   equal(store.contacts.content.length, store.contacts.index.length, 'added to index' )
 })
 
+
 test("should load an array of resources from json", function() {
   equal(store.contacts.content.length, 0, "no resources loaded yet");
 
@@ -83,9 +84,18 @@ test("should find from server if ID is not in store", function(){
 
   dan = store.contacts.findById(3)
   server.respond();
-  
+
   equal(dan.get('id'), 3, "found by id from server")
  
+})
+
+
+test("should update a record if it already exists in the store", function(){
+    store.contacts.load({id: 1, first_name: "joe", last_name: "blow"})
+    store.contacts.load({id: 1, first_name: "joe", last_name: "GO"})
+    equal(store.contacts.get('content').length, 1, "same number of records") 
+    equal(store.contacts.findById(1).get('last_name'), "GO", "same number of records") 
+
 })
 
 test("should find resources via ajax", function() {
